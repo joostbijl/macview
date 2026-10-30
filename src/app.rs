@@ -78,10 +78,14 @@ define_class!(
 
         #[unsafe(method(application:openURLs:))]
         fn open_urls(&self, _app: &NSApplication, urls: &NSArray<NSURL>) {
-            if let Some(url) = urls.iter().next() {
-                if let Some(p) = url.path() {
-                    self.open(PathBuf::from(p.to_string()));
-                }
+            let Some(path) = urls.iter().next().and_then(|u| u.path()) else { return };
+            let path = PathBuf::from(path.to_string());
+            if self.ivars().view.get().is_some() {
+                self.open(path);
+            } else {
+                // Finder delivers the file before applicationDidFinishLaunching:;
+                // the window doesn't exist yet, so open it once it does.
+                *self.ivars().pending.borrow_mut() = Some(path);
             }
         }
 
