@@ -12,7 +12,7 @@ cp target/release/macview "$APP/Contents/MacOS/macview"
 cp packaging/Info.plist "$APP/Contents/Info.plist"
 echo -n 'APPL????' > "$APP/Contents/PkgInfo"
 
-# Icon: optional. Drop a 1024×1024 PNG at packaging/icon.png and it becomes MacView.icns.
+# Icon: packaging/icon.png (any square PNG; 1024×1024 is ideal) becomes MacView.icns.
 if [ -f packaging/icon.png ] && command -v iconutil >/dev/null; then
   ICONSET=$(mktemp -d)/MacView.iconset
   mkdir -p "$ICONSET"

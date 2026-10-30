@@ -1,81 +1,142 @@
+<p align="center">
+  <img src="packaging/icon.png" width="128" alt="MacView">
+</p>
+
 # MacView
 
-A fast, native macOS image viewer in the spirit of IrfanView: one window, the
-image fills it, keyboard-driven browsing through a folder, and the handful of
-edits you actually do on a photo or screenshot (rotate, flip, resize, crop,
-save as). Pure Rust on AppKit via [`objc2`](https://github.com/madsmtm/objc2);
-no web view, no cross-platform toolkit. Apple Silicon only.
+**A fast, native macOS image viewer, in the spirit of IrfanView.**
 
-The name is the obvious one: IrfanView's idea, on a Mac.
+One window. The image fills it. Space steps to the next file in the folder.
+A dozen keyboard shortcuts do everything you actually do to a photo or
+screenshot: rotate, flip, resize, crop, save as. Nothing else.
 
-## Features
+Pure Rust on AppKit (via [`objc2`](https://github.com/madsmtm/objc2)). No
+web view, no cross-platform toolkit, no Electron. The binary is a few MB
+and opens in well under a second. Apple Silicon, macOS 13 or newer.
 
-- Opens anything macOS ImageIO can decode: JPEG, PNG, HEIC, TIFF, GIF, WebP,
-  BMP, PSD, AVIF, camera RAW, …
-- Folder browsing: Space / Backspace, ← →, ↑ ↓, Home / End step through the
-  images in the file's folder (sorted by name). Drag a file or folder onto the
-  window, or use Open With… from Finder.
-- Zoom: `+` / `-`, ⌘-scroll or pinch to zoom at the cursor, scroll to pan,
-  ⌥-drag to pan. ⌘0 fit to window, ⌘1 actual size, `1` (or double-click)
-  toggles between the two. Fit never enlarges.
-- `F` full screen (Esc leaves it).
-- `R` / `L` rotate right/left, ⌘⇧L rotate 180°, `H` / `V` flip.
-- ⌘R Resize/Resample: pixels or percent, long-side presets, keep aspect
-  ratio, four resampling qualities.
-- Drag a selection, ⌘Y crops to it. Esc clears it. ⌘C copies the selection
-  (or the whole image); ⌘V pastes the clipboard as a new image.
-- Canvas Size (add a border or trim), Grayscale, Negative, Auto Adjust Colors.
-- ⌘Z undo (12 steps).
-- ⌘S save in place (JPEG at quality 0.92), ⌘⇧S Save As with a format
-  pop-up and a JPEG quality slider: JPEG, PNG, TIFF, GIF, BMP.
-- `P` Properties: file, dimensions, dpi / print size, bit depth, colour
-  space and the full EXIF dictionary.
-- Delete moves the file to the Trash, F2 renames it, ⌘⌥R reveals it in
-  Finder.
-- Transparent images are drawn over a checkerboard (⌘⇧T toggles).
+> IrfanView has a beaver. So does MacView.
 
-### Not in scope (on purpose)
+## Install
 
-Batch conversion/rename, slideshows, screen capture, scanning, printing,
-e-mail, audio/video, paint tools, watermarks, effects/plug-in filters,
-IPTC editing, multipage TIFF, icon extraction, a thumbnail browser.
-
-### Known limitations in 0.1
-
-- Rotating a JPEG re-encodes it on save (no lossless JPEG transform yet).
-- Save As cannot write HEIC or WebP (ImageIO's `CGImageDestination` isn't
-  wired up yet); opening them works.
-- Properties shows EXIF only; IPTC/XMP are not read.
-- No app icon yet: drop a 1024×1024 `packaging/icon.png` in and the bundle
-  script turns it into an `.icns`.
-
-## Building
-
-Requires Rust (stable) and Xcode command line tools on an Apple Silicon Mac.
+You need Rust (stable) and the Xcode command line tools (`xcode-select --install`).
 
 ```sh
-cargo run --release -- ~/Pictures/some.jpg   # run straight from cargo
-./packaging/bundle.sh                        # builds target/MacView.app
+git clone https://github.com/joostbijl/macview
+cd macview
+./packaging/bundle.sh          # cargo build --release + assemble target/MacView.app
 cp -r target/MacView.app /Applications/
 ```
 
-The bundle is ad-hoc signed so it runs locally without a developer account.
-To make it the default viewer: select an image in Finder, ⌘I, "Open with:"
-MacView, "Change All…".
+The bundle is ad-hoc signed, so it runs locally without an Apple developer
+account. First launch: right-click an image in Finder → Open With → MacView.
+To make it the default viewer: select an image, ⌘I, "Open with:" MacView,
+"Change All…".
 
-## Layout
+To run without bundling: `cargo run --release -- ~/Pictures/photo.jpg`.
 
-| File | What |
+## Using it
+
+Open an image any way you like: Open With from Finder, drag a file or a
+folder onto the window, ⌘O, or `macview photo.jpg` from a shell. The
+window title shows the file name, its position in the folder, pixel size,
+zoom and whether it has unsaved edits.
+
+### Keyboard
+
+| Key | Action |
 | --- | --- |
-| `src/main.rs` | NSApplication bootstrap |
-| `src/app.rs` | App delegate: window, document state, every menu action |
-| `src/view.rs` | `ImageView` (NSView subclass): drawing, zoom/pan, selection, drag-and-drop |
+| **Space** / **Backspace**, → / ←, ↓ / ↑ | Next / previous image in the folder (sorted by name, wraps around) |
+| **Home** / **End** | First / last image |
+| **F** | Full screen on/off (Esc also leaves it) |
+| **1** or double-click | Toggle fit-to-window ↔ actual size |
+| **+** / **−** | Zoom in / out |
+| ⌘0 / ⌘1 | Fit to window / actual size (1:1) |
+| ⌘-scroll, pinch | Zoom at the cursor |
+| scroll, ⌥-drag | Pan a zoomed image |
+| **R** / **L** | Rotate 90° right / left |
+| ⌘⇧L | Rotate 180° |
+| **H** / **V** | Flip horizontal / vertical |
+| ⌘R | Resize / Resample… |
+| ⌘⌥⇧R | Canvas Size… (add a border or trim) |
+| drag | Select a rectangle |
+| ⌘Y | Crop to selection |
+| Esc | Clear selection |
+| ⌘⇧G / ⌘⇧N / ⌘⇧U | Grayscale / Negative / Auto adjust colours |
+| ⌘Z | Undo (12 steps) |
+| ⌘S | Save (same file, same format; JPEG at quality 92) |
+| ⌘⇧S | Save As… (JPEG with quality slider, PNG, TIFF, GIF, BMP) |
+| ⌘C | Copy image (or the selection) to the clipboard |
+| ⌘V | Paste clipboard as a new image |
+| **P** | Properties (Esc closes it) |
+| **Delete** | Move file to Trash |
+| **F2** | Rename file |
+| ⌘⌥R | Reveal in Finder |
+| ⌘⇧R | Reload from disk |
+| ⌘⇧T | Checkerboard behind transparent images on/off |
+
+Every shortcut is also in the menu bar, so you can look them up there.
+
+### Properties (P)
+
+File name, folder, size, modification time, pixel dimensions, megapixels,
+aspect ratio, current zoom, dpi and print size in cm, bit depth, colour
+space, and the complete EXIF dictionary as macOS reads it (camera, lens,
+exposure, ISO, date, GPS, …). Shown in a separate resizable window.
+
+### Resize / Resample (⌘R)
+
+Enter a width and/or height in pixels or percent — with "keep aspect
+ratio" on, the field you changed drives the other — or pick a preset
+(long side 640/1024/1600/2048/4096, half, double). Four resampling
+qualities; "High" is what you want for photos, "Nearest neighbour" for
+pixel art and screenshots you're enlarging.
+
+### Formats
+
+Opens anything macOS ImageIO decodes: JPEG, PNG, HEIC/HEIF, TIFF, GIF,
+WebP, BMP, PSD, AVIF, ICO/ICNS, PDF (first page), OpenEXR, PBM/PGM/PPM
+and camera RAW (CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, …).
+
+Saves JPEG, PNG, TIFF, GIF and BMP.
+
+## What it is not
+
+Deliberately out of scope, now and later: batch conversion and renaming,
+command-line processing, slideshows, screen capture, scanning, printing,
+e-mail, audio/video, paint tools, watermarks, effects and plug-in filters,
+IPTC editing, multipage TIFF, icon extraction. Use IrfanView on Windows,
+or a real editor, for those.
+
+## Known limitations (0.1)
+
+- Rotating a JPEG re-encodes it on save; there is no lossless JPEG
+  transform yet.
+- Save As can't write HEIC or WebP (opening them works).
+- Properties shows EXIF only, not IPTC or XMP.
+- The folder list is read once when a file is opened; files added to the
+  folder afterwards show up after Reload (⌘⇧R) or reopening.
+
+## Code layout
+
+| File | Contents |
+| --- | --- |
+| `src/main.rs` | NSApplication bootstrap, argv handling |
+| `src/app.rs` | App delegate: window, document state (folder list, undo), every menu action |
+| `src/view.rs` | `ImageView`, an NSView subclass: drawing, zoom/pan, selection, drag-and-drop |
 | `src/ops.rs` | Decode, rasterise, rotate/flip/crop/resize/canvas, colour ops, encode |
-| `src/dialogs.rs` | Resize, Canvas, Save As, Rename and Properties UI |
+| `src/dialogs.rs` | Resize, Canvas Size, Save As, Rename and Properties UI |
 | `src/menu.rs` | Menu bar and key equivalents |
 | `src/files.rs` | Folder listing and file metadata |
-| `packaging/` | `Info.plist` and the `.app` bundle script |
+| `packaging/` | `Info.plist`, the app icon and the `.app` bundle script |
+
+Pixel operations work on a plain 8-bit RGBA `Vec<u8>`; AppKit is only used
+to decode, resample (`NSImage` drawing with a chosen interpolation) and
+encode (`NSBitmapImageRep`). Objective-C classes are declared with
+`objc2::define_class!`; two things that bite there are documented in the
+code: an explicit `return` inside an ObjC method skips the macro's
+`bool → BOOL` conversion, and ObjC action methods can't be called as Rust
+functions.
 
 ## Licence
 
-MIT.
+MIT. The beaver is MacView's own.

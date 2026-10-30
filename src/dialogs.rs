@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2::{msg_send, MainThreadMarker, MainThreadOnly};
+use objc2::{define_class, msg_send, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSAlert, NSAlertFirstButtonReturn, NSBackingStoreType, NSBitmapImageRep, NSButton,
     NSButtonType, NSControlStateValueOn, NSFont, NSFontWeightRegular, NSImage,
@@ -382,11 +382,37 @@ fn describe(obj: &AnyObject) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+define_class!(
+    /// A window that closes on Esc (the text view forwards Esc up the
+    /// responder chain as cancelOperation:).
+    #[unsafe(super(NSWindow))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "MacViewPropertiesWindow"]
+    pub struct PropertiesWindow;
+
+    impl PropertiesWindow {
+        #[unsafe(method(cancelOperation:))]
+        fn cancel_operation(&self, _sender: Option<&AnyObject>) {
+            self.close();
+        }
+
+        #[unsafe(method(keyDown:))]
+        fn key_down(&self, event: &objc2_app_kit::NSEvent) {
+            if event.keyCode() == 53 {
+                // Esc
+                self.close();
+            } else {
+                let _: () = unsafe { msg_send![super(self), keyDown: event] };
+            }
+        }
+    }
+);
+
 pub fn show_properties(mtm: MainThreadMarker, title: &str, text: &str) -> Retained<NSWindow> {
     let style = NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Resizable;
-    let window = unsafe {
-        NSWindow::initWithContentRect_styleMask_backing_defer(
-            NSWindow::alloc(mtm),
+    let window: Retained<PropertiesWindow> = unsafe {
+        PropertiesWindow::initWithContentRect_styleMask_backing_defer(
+            PropertiesWindow::alloc(mtm),
             rect(0.0, 0.0, 620.0, 520.0),
             style,
             NSBackingStoreType::Buffered,
@@ -410,5 +436,5 @@ pub fn show_properties(mtm: MainThreadMarker, title: &str, text: &str) -> Retain
     // We keep our own Retained<NSWindow>; don't let AppKit free it on close.
     unsafe { window.setReleasedWhenClosed(false) };
     window.makeKeyAndOrderFront(None);
-    window
+    Retained::into_super(window)
 }
