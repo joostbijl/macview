@@ -473,7 +473,7 @@ impl AppDelegate {
             | NSWindowStyleMask::Closable
             | NSWindowStyleMask::Miniaturizable
             | NSWindowStyleMask::Resizable;
-        let window: Retained<NSWindow> = unsafe {
+        let window: Retained<MainWindow> = unsafe {
             msg_send![
                 MainWindow::alloc(mtm),
                 initWithContentRect: frame,
@@ -482,6 +482,7 @@ impl AppDelegate {
                 defer: false,
             ]
         };
+        let window: Retained<NSWindow> = Retained::into_super(window);
         window.setTitle(&ns("MacView"));
         window.setMinSize(NSSize::new(320.0, 240.0));
         window.setFrameAutosaveName(&ns("MacViewMain"));
