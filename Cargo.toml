@@ -1,0 +1,19 @@
+[package]
+name = "macview"
+version = "0.1.0"
+edition = "2021"
+description = "MacView — a fast, native macOS image viewer (IrfanView-style)"
+license = "MIT"
+
+[dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["objc2-core-foundation", "NSNotification", "NSArray", "NSDictionary", "NSString", "NSURL", "NSData", "NSObject", "NSValue", "NSGeometry", "NSEnumerator", "NSFileManager", "NSError", "NSNotification", "NSThread", "NSRunLoop", "NSAttributedString"] }
+objc2-app-kit = { version = "0.3", features = ["objc2-core-foundation", "block2", "NSButtonCell", "NSTextFieldCell", "NSFontDescriptor", "NSApplication", "NSWindow", "NSView", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSGraphics", "NSResponder", "NSEvent", "NSMenu", "NSMenuItem", "NSOpenPanel", "NSSavePanel", "NSPanel", "NSAlert", "NSColor", "NSBezierPath", "NSScrollView", "NSClipView", "NSPasteboard", "NSTextField", "NSTextView", "NSButton", "NSControl", "NSCell", "NSPopUpButton", "NSSlider", "NSWorkspace", "NSRunningApplication", "NSScreen", "NSCursor", "NSDragging", "NSAffineTransform", "NSAppearance", "NSFont", "NSText", "NSStackView", "NSLayoutConstraint", "NSUserInterfaceLayout", "NSUserInterfaceItemIdentification", "NSWindowController", "NSViewController", "NSSplitView", "NSBox"] }
+block2 = "0.6"
+objc2-core-foundation = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

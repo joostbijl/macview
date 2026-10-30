@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>            <string>MacView</string>
+    <key>CFBundleDisplayName</key>     <string>MacView</string>
+    <key>CFBundleIdentifier</key>      <string>nl.joostbijl.macview</string>
+    <key>CFBundleVersion</key>         <string>0.1.0</string>
+    <key>CFBundleShortVersionString</key> <string>0.1.0</string>
+    <key>CFBundleExecutable</key>      <string>macview</string>
+    <key>CFBundlePackageType</key>     <string>APPL</string>
+    <key>CFBundleIconFile</key>        <string>MacView</string>
+    <key>LSMinimumSystemVersion</key>  <string>13.0</string>
+    <key>LSApplicationCategoryType</key> <string>public.app-category.graphics-design</string>
+    <key>NSHighResolutionCapable</key> <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key> <true/>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>   <string>Image</string>
+            <key>CFBundleTypeRole</key>   <string>Editor</string>
+            <key>LSHandlerRank</key>      <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.image</string>
+                <string>public.jpeg</string>
+                <string>public.png</string>
+                <string>public.tiff</string>
+                <string>public.heic</string>
+                <string>public.heif</string>
+                <string>com.compuserve.gif</string>
+                <string>com.microsoft.bmp</string>
+                <string>org.webmproject.webp</string>
+                <string>com.adobe.photoshop-image</string>
+                <string>public.camera-raw-image</string>
+                <string>public.avif</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
