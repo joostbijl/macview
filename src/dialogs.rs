@@ -411,13 +411,13 @@ define_class!(
 pub fn show_properties(mtm: MainThreadMarker, title: &str, text: &str) -> Retained<NSWindow> {
     let style = NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Resizable;
     let window: Retained<PropertiesWindow> = unsafe {
-        PropertiesWindow::initWithContentRect_styleMask_backing_defer(
+        msg_send![
             PropertiesWindow::alloc(mtm),
-            rect(0.0, 0.0, 620.0, 520.0),
-            style,
-            NSBackingStoreType::Buffered,
-            false,
-        )
+            initWithContentRect: rect(0.0, 0.0, 620.0, 520.0),
+            styleMask: style,
+            backing: NSBackingStoreType::Buffered,
+            defer: false,
+        ]
     };
     window.setTitle(&ns(title));
     let scroll = NSTextView::scrollableTextView(mtm);
