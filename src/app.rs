@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
-use objc2::{define_class, msg_send, DefinedClass, MainThreadMarker, MainThreadOnly};
+use objc2::{define_class, msg_send, AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSApplicationDelegate, NSBackingStoreType, NSEvent, NSImage, NSMenuItem,
     NSModalResponseOK, NSOpenPanel, NSPasteboard, NSPasteboardTypePNG, NSPasteboardTypeTIFF,
@@ -73,7 +73,7 @@ define_class!(
             } else {
                 self.update_title();
             }
-            app.activateIgnoringOtherApps(true);
+            app.activate();
         }
 
         #[unsafe(method(application:openURLs:))]
@@ -97,22 +97,7 @@ define_class!(
     impl AppDelegate {
         #[unsafe(method(validateMenuItem:))]
         fn validate_menu_item(&self, item: &NSMenuItem) -> bool {
-            let app = NSApplication::sharedApplication(self.mtm());
-            if app.modalWindow().is_some() {
-                return false;
-            }
-            let Some(action) = item.action() else { return true };
-            let name = action.name().to_string_lossy().into_owned();
-            let has_image = self.view().image().is_some();
-            let has_file = self.ivars().doc.borrow().path.is_some();
-            match name.as_str() {
-                "openDocument:" | "pasteImage:" | "macviewFullScreen:" | "performClose:" => true,
-                "cropToSelection:" => self.view().selection().is_some(),
-                "undoImage:" => !self.ivars().doc.borrow().undo.is_empty(),
-                "renameFile:" | "moveToTrash:" | "revealInFinder:" | "reloadImage:" | "showProperties:" => has_file,
-                "nextImage:" | "prevImage:" | "firstImage:" | "lastImage:" => self.ivars().doc.borrow().files.len() > 1,
-                _ => has_image,
-            }
+            self.menu_item_enabled(item)
         }
     }
 
@@ -142,20 +127,18 @@ define_class!(
         }
 
         #[unsafe(method(saveDocument:))]
-        fn save_document(&self, s: Option<&AnyObject>) {
+        fn save_document(&self, _s: Option<&AnyObject>) {
             let path = self.ivars().doc.borrow().path.clone();
             let fmt = path.as_deref().and_then(|p| Format::from_extension(&files::extension_lower(p)));
             match (path, fmt) {
                 (Some(p), Some(fmt)) => self.write_image(&p, fmt, 0.92),
-                _ => self.save_document_as(s),
+                _ => self.do_save_as(),
             }
         }
 
         #[unsafe(method(saveDocumentAs:))]
         fn save_document_as(&self, _s: Option<&AnyObject>) {
-            let current = self.ivars().doc.borrow().path.clone();
-            let Some(r) = dialogs::save_as(self.mtm(), current.as_deref()) else { return };
-            self.write_image(&r.path, r.format, r.jpeg_quality);
+            self.do_save_as();
         }
 
         #[unsafe(method(renameFile:))]
@@ -190,8 +173,9 @@ define_class!(
             // Drop it from the list and show the next one.
             let next = {
                 let mut doc = self.ivars().doc.borrow_mut();
-                if doc.index < doc.files.len() {
-                    doc.files.remove(doc.index);
+                let i = doc.index;
+                if i < doc.files.len() {
+                    doc.files.remove(i);
                 }
                 if doc.files.is_empty() {
                     None
@@ -431,6 +415,25 @@ define_class!(
 );
 
 impl AppDelegate {
+    fn menu_item_enabled(&self, item: &NSMenuItem) -> bool {
+        let app = NSApplication::sharedApplication(self.mtm());
+        if app.modalWindow().is_some() {
+            return false;
+        }
+        let Some(action) = item.action() else { return true };
+        let name = action.name().to_string_lossy().into_owned();
+        let has_image = self.view().image().is_some();
+        let has_file = self.ivars().doc.borrow().path.is_some();
+        match name.as_str() {
+            "openDocument:" | "pasteImage:" | "macviewFullScreen:" | "performClose:" => true,
+            "cropToSelection:" => self.view().selection().is_some(),
+            "undoImage:" => !self.ivars().doc.borrow().undo.is_empty(),
+            "renameFile:" | "moveToTrash:" | "revealInFinder:" | "reloadImage:" | "showProperties:" => has_file,
+            "nextImage:" | "prevImage:" | "firstImage:" | "lastImage:" => self.ivars().doc.borrow().files.len() > 1,
+            _ => has_image,
+        }
+    }
+
     pub fn new(mtm: MainThreadMarker) -> Retained<Self> {
         let this = Self::alloc(mtm).set_ivars(AppIvars {
             pending: RefCell::new(None),
@@ -586,6 +589,12 @@ impl AppDelegate {
         let keep_zoom = !matches!(self.view().zoom_mode(), ZoomMode::Custom(_));
         self.view().set_image(Some(new), keep_zoom);
         self.update_title();
+    }
+
+    fn do_save_as(&self) {
+        let current = self.ivars().doc.borrow().path.clone();
+        let Some(r) = dialogs::save_as(self.mtm(), current.as_deref()) else { return };
+        self.write_image(&r.path, r.format, r.jpeg_quality);
     }
 
     fn write_image(&self, path: &Path, fmt: Format, quality: f64) {

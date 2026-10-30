@@ -179,23 +179,23 @@ define_class!(
 
         #[unsafe(method(performDragOperation:))]
         fn perform_drag_operation(&self, sender: &ProtocolObject<dyn NSDraggingInfo>) -> bool {
-            let pb = sender.draggingPasteboard();
-            let classes = NSArray::from_slice(&[NSURL::class()]);
-            let objects = unsafe { pb.readObjectsForClasses_options(&classes, None) };
-            if let Some(objects) = objects {
-                for obj in objects.iter() {
-                    if let Some(url) = obj.downcast_ref::<NSURL>() {
-                        if let Some(path) = url.path() {
-                            crate::app::open_path(std::path::PathBuf::from(path.to_string()));
-                            return true;
-                        }
-                    }
-                }
-            }
-            false
+            // No early `return` here: define_class! converts only the final
+            // expression from bool to Bool.
+            dropped_file(sender).map(crate::app::open_path).is_some()
         }
     }
 );
+
+/// First file URL on a drag pasteboard, as a path.
+fn dropped_file(sender: &ProtocolObject<dyn NSDraggingInfo>) -> Option<std::path::PathBuf> {
+    let pb = sender.draggingPasteboard();
+    let classes = NSArray::from_slice(&[NSURL::class()]);
+    let objects = unsafe { pb.readObjectsForClasses_options(&classes, None) }?;
+    objects
+        .iter()
+        .find_map(|obj| obj.downcast_ref::<NSURL>().and_then(|u| u.path()))
+        .map(|p| std::path::PathBuf::from(p.to_string()))
+}
 
 impl ImageView {
     pub fn new(mtm: MainThreadMarker, frame: NSRect) -> Retained<Self> {
