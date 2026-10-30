@@ -9,10 +9,11 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{define_class, msg_send, AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
-    NSApplication, NSApplicationDelegate, NSBackingStoreType, NSEvent, NSImage, NSMenuItem,
-    NSModalResponseOK, NSOpenPanel, NSPasteboard, NSPasteboardTypePNG, NSPasteboardTypeTIFF,
-    NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
+    NSApplication, NSApplicationDelegate, NSApplicationPresentationOptions, NSBackingStoreType,
+    NSEvent, NSImage, NSMenuItem, NSModalResponseOK, NSOpenPanel, NSPasteboard,
+    NSPasteboardTypePNG, NSPasteboardTypeTIFF, NSWindow, NSWindowStyleMask, NSWorkspace,
 };
+use std::cell::Cell;
 use objc2_foundation::{NSArray, NSNotification, NSObject, NSObjectProtocol, NSPoint, NSRect, NSSize, NSURL};
 
 use crate::dialogs;
@@ -41,6 +42,8 @@ pub struct AppIvars {
     view: OnceCell<Retained<ImageView>>,
     doc: RefCell<Doc>,
     props: RefCell<Option<Retained<NSWindow>>>,
+    /// Window frame to restore when leaving full screen (None = windowed).
+    saved_frame: Cell<Option<NSRect>>,
 }
 
 thread_local! {
@@ -355,14 +358,22 @@ define_class!(
     impl AppDelegate {
         #[unsafe(method(macviewFullScreen:))]
         fn full_screen(&self, _s: Option<&AnyObject>) {
-            if let Some(w) = self.ivars().window.get() {
-                w.toggleFullScreen(None);
-            }
+            self.toggle_full_screen();
+        }
+
+        #[unsafe(method(cycleZoomMode:))]
+        fn cycle_zoom_mode(&self, _s: Option<&AnyObject>) {
+            cycle_zoom_mode();
         }
 
         #[unsafe(method(toggleFitActual:))]
         fn toggle_fit_actual(&self, _s: Option<&AnyObject>) {
             toggle_fit_actual();
+        }
+
+        #[unsafe(method(zoomFitWidth:))]
+        fn zoom_fit_width(&self, _s: Option<&AnyObject>) {
+            self.view().set_zoom_mode(ZoomMode::FitWidth);
         }
 
         #[unsafe(method(zoomIn:))]
@@ -445,6 +456,7 @@ impl AppDelegate {
             view: OnceCell::new(),
             doc: RefCell::new(Doc::default()),
             props: RefCell::new(None),
+            saved_frame: Cell::new(None),
         });
         let this: Retained<Self> = unsafe { msg_send![super(this), init] };
         DELEGATE.with(|d| *d.borrow_mut() = Some(this.clone()));
@@ -461,18 +473,17 @@ impl AppDelegate {
             | NSWindowStyleMask::Closable
             | NSWindowStyleMask::Miniaturizable
             | NSWindowStyleMask::Resizable;
-        let window = unsafe {
-            NSWindow::initWithContentRect_styleMask_backing_defer(
-                NSWindow::alloc(mtm),
-                frame,
-                style,
-                NSBackingStoreType::Buffered,
-                false,
-            )
+        let window: Retained<NSWindow> = unsafe {
+            msg_send![
+                MainWindow::alloc(mtm),
+                initWithContentRect: frame,
+                styleMask: style,
+                backing: NSBackingStoreType::Buffered,
+                defer: false,
+            ]
         };
         window.setTitle(&ns("MacView"));
         window.setMinSize(NSSize::new(320.0, 240.0));
-        window.setCollectionBehavior(NSWindowCollectionBehavior::FullScreenPrimary);
         window.setFrameAutosaveName(&ns("MacViewMain"));
         unsafe { window.setReleasedWhenClosed(false) };
 
@@ -484,6 +495,43 @@ impl AppDelegate {
 
         let _ = self.ivars().view.set(view);
         let _ = self.ivars().window.set(window);
+    }
+
+    /// IrfanView-style full screen: no Space switch, no animation. The
+    /// window just loses its frame and covers the screen; Enter or Esc
+    /// brings it back.
+    pub fn toggle_full_screen(&self) {
+        let Some(window) = self.ivars().window.get() else { return };
+        let app = NSApplication::sharedApplication(self.mtm());
+        match self.ivars().saved_frame.take() {
+            Some(frame) => {
+                app.setPresentationOptions(NSApplicationPresentationOptions::Default);
+                window.setStyleMask(
+                    NSWindowStyleMask::Titled
+                        | NSWindowStyleMask::Closable
+                        | NSWindowStyleMask::Miniaturizable
+                        | NSWindowStyleMask::Resizable,
+                );
+                window.setFrame_display(frame, true);
+                self.update_title();
+            }
+            None => {
+                let Some(screen) = window.screen() else { return };
+                self.ivars().saved_frame.set(Some(window.frame()));
+                app.setPresentationOptions(
+                    NSApplicationPresentationOptions::HideDock
+                        | NSApplicationPresentationOptions::HideMenuBar,
+                );
+                window.setStyleMask(NSWindowStyleMask::Borderless);
+                window.setFrame_display(screen.frame(), true);
+            }
+        }
+        window.makeFirstResponder(Some(self.view()));
+        window.makeKeyAndOrderFront(None);
+    }
+
+    pub fn is_full_screen(&self) -> bool {
+        self.ivars().saved_frame.get().is_some()
     }
 
     /// Open a file from outside the current folder list (Open…, drag, argv).
@@ -674,6 +722,19 @@ pub fn update_title() {
     with(|d| d.update_title());
 }
 
+/// F: Fit → Actual (1:1) → Fit width → Fit …
+pub fn cycle_zoom_mode() {
+    with(|d| {
+        let v = d.view();
+        let mode = match v.zoom_mode() {
+            ZoomMode::Fit => ZoomMode::Actual,
+            ZoomMode::Actual => ZoomMode::FitWidth,
+            _ => ZoomMode::Fit,
+        };
+        v.set_zoom_mode(mode);
+    });
+}
+
 pub fn toggle_fit_actual() {
     with(|d| {
         let v = d.view();
@@ -695,14 +756,20 @@ pub fn key_fallback(event: &NSEvent) -> bool {
         match c {
             '\u{1b}' => {
                 // Escape: leave full screen first, otherwise drop the selection.
-                if let Some(w) = d.ivars().window.get() {
-                    if w.styleMask().contains(NSWindowStyleMask::FullScreen) {
-                        w.toggleFullScreen(None);
-                        return true;
-                    }
+                if d.is_full_screen() {
+                    d.toggle_full_screen();
+                } else {
+                    view.clear_selection();
+                    d.update_title();
                 }
-                view.clear_selection();
-                d.update_title();
+                true
+            }
+            '\r' | '\u{3}' => {
+                d.toggle_full_screen();
+                true
+            }
+            'f' => {
+                cycle_zoom_mode();
                 true
             }
             ' ' | '\u{F703}' | '\u{F701}' => {
@@ -731,3 +798,25 @@ pub fn key_fallback(event: &NSEvent) -> bool {
 fn _assert_delegate_is_object(d: &AppDelegate) -> &ProtocolObject<dyn NSApplicationDelegate> {
     ProtocolObject::from_ref(d)
 }
+
+define_class!(
+    /// The main window. A borderless window refuses to become key by
+    /// default, which would kill keyboard input in full screen; this one
+    /// always accepts.
+    #[unsafe(super(NSWindow))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "MacViewMainWindow"]
+    pub struct MainWindow;
+
+    impl MainWindow {
+        #[unsafe(method(canBecomeKeyWindow))]
+        fn can_become_key(&self) -> bool {
+            true
+        }
+
+        #[unsafe(method(canBecomeMainWindow))]
+        fn can_become_main(&self) -> bool {
+            true
+        }
+    }
+);

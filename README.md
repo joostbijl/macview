@@ -6,7 +6,8 @@
 
 **A fast, native macOS image viewer, in the spirit of IrfanView.**
 
-One window. The image fills it. Space steps to the next file in the folder.
+One window. The image fills it. Space steps to the next file in the folder,
+F switches between fit and 1:1, Enter goes full screen.
 A dozen keyboard shortcuts do everything you actually do to a photo or
 screenshot: rotate, flip, resize, crop, save as. Nothing else.
 
@@ -47,10 +48,11 @@ zoom and whether it has unsaved edits.
 | --- | --- |
 | **Space** / **Backspace**, → / ←, ↓ / ↑ | Next / previous image in the folder (sorted by name, wraps around) |
 | **Home** / **End** | First / last image |
-| **F** | Full screen on/off (Esc also leaves it) |
+| **F** | Next zoom mode: fit to window → actual size (1:1) → fit to width → … |
 | **1** or double-click | Toggle fit-to-window ↔ actual size |
+| **Enter** | Full screen on/off (plain IrfanView-style: no animation, no Space switch; Esc also leaves it) |
 | **+** / **−** | Zoom in / out |
-| ⌘0 / ⌘1 | Fit to window / actual size (1:1) |
+| ⌘0 / ⌘1 / ⌘2 | Fit to window / actual size (1:1) / fit to width |
 | ⌘-scroll, pinch | Zoom at the cursor |
 | scroll, ⌥-drag | Pan a zoomed image |
 | **R** / **L** | Rotate 90° right / left |

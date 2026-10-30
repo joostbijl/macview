@@ -19,6 +19,8 @@ pub enum ZoomMode {
     Fit,
     /// 1 image pixel = 1 point.
     Actual,
+    /// Scale to the window width (may enlarge; scroll vertically).
+    FitWidth,
     /// An explicit scale factor.
     Custom(f64),
 }
@@ -271,6 +273,7 @@ impl ImageView {
                 let s = (b.size.width / iw).min(b.size.height / ih);
                 s.min(1.0)
             }
+            ZoomMode::FitWidth => self.bounds().size.width / iw,
         })
     }
 
